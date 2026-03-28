@@ -4,3 +4,5 @@
 *.class
 *Test.java
 **/test/
+/.vscode/launch.json
+/.vscode/settings.json
