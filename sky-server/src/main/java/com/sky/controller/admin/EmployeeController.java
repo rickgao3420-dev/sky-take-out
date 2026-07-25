@@ -99,10 +99,22 @@ public class EmployeeController {
     public Result<PageResult> Page(EmployeePageQueryDTO employeePageQueryDTO) {
         log.info("员工分页查询参数为：{}", employeePageQueryDTO);
         PageResult pageResult = employeeService.pageQuery(employeePageQueryDTO);
-
         return Result.success(pageResult);
+    }
 
-
+    /**
+     * 启用禁用员工账号
+     * @param status
+     * @param id
+     * @return
+     */
+    @PostMapping("/status/{status}")
+    @ApiOperation("启用禁用员工账号")
+    public Result startOrStop(@PathVariable Integer status, Long id) {
+        log.info("员工状态：{}", status);
+        log.info("员工id：{}", id);
+        employeeService.startOrStop(status, id);
+        return Result.success();
     }
 
 
