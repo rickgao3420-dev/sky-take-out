@@ -6,3 +6,4 @@
 **/test/
 /.vscode/launch.json
 /.vscode/settings.json
+/sky-server/src/main/resources/application-dev.yml
