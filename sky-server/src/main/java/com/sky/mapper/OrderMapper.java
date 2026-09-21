@@ -60,6 +60,14 @@ public interface OrderMapper {
     List<Orders> getByStatusAndOrderTimeLT(Integer status, LocalDateTime orderTime);
 
     /**
+     * 根据状态统计订单数量
+     * @param status
+     * @return
+     */
+    @Select("select count(id) from orders where status = #{status}")
+    Integer countStatus(Integer status);
+
+    /**
      * 统计时间区间内每天的营业额，按日期升序
      * @param begin 开始时间（包含）
      * @param end 结束时间（不包含）
