@@ -67,4 +67,42 @@
         </where>
         order by order_time desc
     </select>
+
+    <!-- 每天的营业额：只统计已完成订单，没有订单的日期不会出现在结果中，由service补0 -->
+    <select id="sumAmountGroupByDate" resultType="map">
+        select date_format(order_time, '%Y-%m-%d') as orderDate,
+               sum(amount)                         as amount
+        from orders
+        where status = #{status}
+          and order_time &gt;= #{begin}
+          and order_time &lt; #{end}
+        group by date_format(order_time, '%Y-%m-%d')
+        order by orderDate
+    </select>
+
+    <!-- 每天的订单总数和有效订单数 -->
+    <select id="countGroupByDate" resultType="map">
+        select date_format(order_time, '%Y-%m-%d')                 as orderDate,
+               count(*)                                            as orderCount,
+               sum(case when status = #{status} then 1 else 0 end) as validOrderCount
+        from orders
+        where order_time &gt;= #{begin}
+          and order_time &lt; #{end}
+        group by date_format(order_time, '%Y-%m-%d')
+        order by orderDate
+    </select>
+
+    <!-- 销量排名前10的菜品和套餐：一个菜品/套餐可能被多个订单点到，按名称分组累加数量 -->
+    <select id="getSalesTop10" resultType="map">
+        select od.name        as name,
+               sum(od.number) as saleCount
+        from order_detail od
+                 inner join orders o on od.order_id = o.id
+        where o.status = #{status}
+          and o.order_time &gt;= #{begin}
+          and o.order_time &lt; #{end}
+        group by od.name
+        order by saleCount desc
+        limit 10
+    </select>
 </mapper>
