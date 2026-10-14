@@ -76,7 +76,7 @@ public class UserServiceImpl implements UserService {
         String json = HttpClientUtil.doGet(WX_LOGIN, map);
 
         //打印微信接口返回的结果，便于排查登录失败问题
-        log.info("微信登录接口返回: {}", json);
+        log.debug("已收到微信登录响应（不记录凭证内容）");
 
         if (json == null || json.isEmpty()) {
             throw new LoginFailedException(MessageConstant.LOGIN_FAILED);

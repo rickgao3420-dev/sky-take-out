@@ -107,7 +107,7 @@ public class AddressBookController {
             return Result.success(list.get(0));
         }
 
-        return Result.error("没有查询到默认地址");
+        return Result.success(null);
     }
 
 }

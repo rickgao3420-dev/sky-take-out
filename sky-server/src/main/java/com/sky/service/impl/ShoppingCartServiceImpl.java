@@ -2,121 +2,76 @@ package com.sky.service.impl;
 
 import com.sky.context.BaseContext;
 import com.sky.dto.ShoppingCartDTO;
-import com.sky.entity.Dish;
-import com.sky.entity.Setmeal;
 import com.sky.entity.ShoppingCart;
-import com.sky.mapper.DishMapper;
-import com.sky.mapper.SetmealMapper;
 import com.sky.mapper.ShoppingCartMapper;
 import com.sky.service.ShoppingCartService;
-import lombok.extern.slf4j.Slf4j;
+import com.sky.service.support.CartRules;
+import com.sky.service.support.UserWriteLock;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
+import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
-@Slf4j
+@RequiredArgsConstructor
 public class ShoppingCartServiceImpl implements ShoppingCartService {
+    private final ShoppingCartMapper shoppingCartMapper;
+    private final UserWriteLock userWriteLock;
+    private final CartRules rules;
 
-    @Autowired
-    private ShoppingCartMapper shoppingCartMapper;
-    @Autowired
-    private DishMapper dishMapper;
-    @Autowired
-    private SetmealMapper setmealMapper;
+    @Transactional
+    public void addShoppingCart(ShoppingCartDTO dto) {
+        Long userId = userWriteLock.lock();
+        rules.requireOpen();
+        ShoppingCart row = new ShoppingCart();
+        BeanUtils.copyProperties(dto, row);
+        row.setUserId(userId);
+        rules.hydrate(row);
+        merge(row, 1);
+    }
 
-    /**
-     * 添加购物车
-     *
-     * @param shoppingCartDTO
-     */
-    public void addShoppingCart(ShoppingCartDTO shoppingCartDTO) {
-        //判断当前加入到购物车中的商品是否已经存在了
-        ShoppingCart shoppingCart = new ShoppingCart();
-        BeanUtils.copyProperties(shoppingCartDTO, shoppingCart);
-        Long userId = BaseContext.getCurrentId();
-        shoppingCart.setUserId(userId);
-
-        List<ShoppingCart> list = shoppingCartMapper.list(shoppingCart);
-
-        //如果已经存在了，只需要将数量+1
-        if (list != null && list.size() > 0) {
-            ShoppingCart cart = list.get(0);
-            cart.setNumber(cart.getNumber() + 1);
-            shoppingCartMapper.updateNumberById(cart);
+    /** 调用者必须已在事务中锁定用户；再来一单复用此入口。 */
+    public void merge(ShoppingCart row, int quantity) {
+        rules.quantity(quantity);
+        List<ShoppingCart> matches = shoppingCartMapper.list(ShoppingCart.builder().userId(row.getUserId()).build())
+                .stream().filter(x -> rules.same(x, row)).collect(Collectors.toList());
+        int total = quantity;
+        for (ShoppingCart match : matches) { rules.quantity(match.getNumber()); total += match.getNumber(); }
+        rules.quantity(total);
+        row.setNumber(total);
+        if (matches.isEmpty()) {
+            row.setCreateTime(LocalDateTime.now());
+            shoppingCartMapper.insert(row);
         } else {
-            //如果不存在，需要插入一条购物车数据
-            //判断本次添加到购物车的是菜品还是套餐
-            Long dishId = shoppingCartDTO.getDishId();
-            if (dishId != null) {
-                //本次添加的是菜品
-                Dish dish = dishMapper.getById(dishId);
-                shoppingCart.setName(dish.getName());
-                shoppingCart.setImage(dish.getImage());
-                shoppingCart.setAmount(dish.getPrice());
-            } else {
-                //本次添加的是套餐
-                Long setmealId = shoppingCartDTO.getSetmealId();
-                Setmeal setmeal = setmealMapper.getById(setmealId);
-                shoppingCart.setName(setmeal.getName());
-                shoppingCart.setImage(setmeal.getImage());
-                shoppingCart.setAmount(setmeal.getPrice());
-            }
-            shoppingCart.setNumber(1);
-            shoppingCart.setCreateTime(LocalDateTime.now());
-            shoppingCartMapper.insert(shoppingCart);
+            row.setId(matches.get(0).getId());
+            shoppingCartMapper.updateSnapshot(row);
+            // 兼容旧数据：将重复 SKU 归并到第一条。
+            for (int i = 1; i < matches.size(); i++) shoppingCartMapper.deleteById(matches.get(i).getId());
         }
     }
 
-    /**
-     * 查看购物车
-     *
-     * @return
-     */
     public List<ShoppingCart> showShoppingCart() {
-        //获取当前微信用户的id
-        Long userId = BaseContext.getCurrentId();
-        ShoppingCart shoppingCart = ShoppingCart.builder()
-                .userId(userId)
-                .build();
-        return shoppingCartMapper.list(shoppingCart);
+        return shoppingCartMapper.list(ShoppingCart.builder().userId(BaseContext.getCurrentId()).build());
     }
 
-    /**
-     * 清空购物车
-     */
-    public void cleanShoppingCart() {
-        //获取当前微信用户的id
-        Long userId = BaseContext.getCurrentId();
-        shoppingCartMapper.deleteByUserId(userId);
-    }
+    @Transactional
+    public void cleanShoppingCart() { shoppingCartMapper.deleteByUserId(userWriteLock.lock()); }
 
-    /**
-     * 删除购物车中一个商品
-     *
-     * @param shoppingCartDTO
-     */
-    public void subShoppingCart(ShoppingCartDTO shoppingCartDTO) {
-        ShoppingCart shoppingCart = new ShoppingCart();
-        BeanUtils.copyProperties(shoppingCartDTO, shoppingCart);
-        //设置用户id
-        shoppingCart.setUserId(BaseContext.getCurrentId());
-
-        List<ShoppingCart> list = shoppingCartMapper.list(shoppingCart);
-
-        if (list != null && list.size() > 0) {
-            ShoppingCart cart = list.get(0);
-            Integer number = cart.getNumber();
-            if (number == 1) {
-                //数量为1，直接删除这条记录
-                shoppingCartMapper.deleteById(cart.getId());
-            } else {
-                //数量大于1，数量减一
-                cart.setNumber(number - 1);
-                shoppingCartMapper.updateNumberById(cart);
+    @Transactional
+    public void subShoppingCart(ShoppingCartDTO dto) {
+        Long userId = userWriteLock.lock();
+        ShoppingCart key = new ShoppingCart(); BeanUtils.copyProperties(dto, key); rules.identity(key);
+        List<ShoppingCart> rows = shoppingCartMapper.list(ShoppingCart.builder().userId(userId).build());
+        // 下架商品仍允许移除；空口味只匹配空口味，不泛匹配。
+        for (ShoppingCart row : rows) {
+            if (rules.same(row, key)) {
+                rules.quantity(row.getNumber());
+                if (row.getNumber() == 1) shoppingCartMapper.deleteById(row.getId());
+                else { row.setNumber(row.getNumber() - 1); shoppingCartMapper.updateNumberById(row); }
+                return;
             }
         }
     }

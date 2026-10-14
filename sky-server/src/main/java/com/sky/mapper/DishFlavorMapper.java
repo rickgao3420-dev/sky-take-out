@@ -20,7 +20,7 @@ public interface DishFlavorMapper {
      * @param dishId
      * @return
      */
-    @org.apache.ibatis.annotations.Select("select * from dish_flavor where dish_id = #{dishId}")
+    @org.apache.ibatis.annotations.Select("select * from dish_flavor where dish_id = #{dishId} order by id")
     List<DishFlavor> getByDishId(Long dishId);
 
     /**

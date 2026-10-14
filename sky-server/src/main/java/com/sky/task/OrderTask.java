@@ -15,6 +15,7 @@ import java.util.List;
  */
 @Component
 @Slf4j
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "sky.order.scheduling-enabled", havingValue = "true", matchIfMissing = true)
 public class OrderTask {
 
     @Autowired
@@ -38,7 +39,7 @@ public class OrderTask {
                         .cancelReason("订单超时，自动取消")
                         .cancelTime(LocalDateTime.now())
                         .build();
-                orderMapper.update(cancelOrder);
+                orderMapper.updateExpected(cancelOrder, Orders.PENDING_PAYMENT);
             }
         }
     }
@@ -59,7 +60,7 @@ public class OrderTask {
                         .id(orders.getId())
                         .status(Orders.COMPLETED)
                         .build();
-                orderMapper.update(completedOrder);
+                orderMapper.updateExpected(completedOrder, Orders.DELIVERY_IN_PROGRESS);
             }
         }
     }

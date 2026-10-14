@@ -2,6 +2,18 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
 <mapper namespace="com.sky.mapper.OrderMapper">
+    <update id="updateExpected">
+        update orders
+        <set>
+            <if test="order.status != null">status = #{order.status},</if>
+            <if test="order.payStatus != null">pay_status = #{order.payStatus},</if>
+            <if test="order.cancelReason != null">cancel_reason = #{order.cancelReason},</if>
+            <if test="order.rejectionReason != null">rejection_reason = #{order.rejectionReason},</if>
+            <if test="order.cancelTime != null">cancel_time = #{order.cancelTime},</if>
+            <if test="order.deliveryTime != null">delivery_time = #{order.deliveryTime},</if>
+        </set>
+        where id = #{order.id} and status = #{expectedStatus}
+    </update>
 
     <insert id="insert" parameterType="Orders" useGeneratedKeys="true" keyProperty="id">
         insert into orders (number, status, user_id, address_book_id, order_time, checkout_time, pay_method, pay_status,

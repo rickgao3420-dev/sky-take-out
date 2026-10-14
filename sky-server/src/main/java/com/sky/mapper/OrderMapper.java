@@ -13,6 +13,12 @@ import java.util.Map;
 
 @Mapper
 public interface OrderMapper {
+    /** 状态比较更新，防止支付/取消/接单/定时任务覆盖彼此。 */
+    int updateExpected(@Param("order") Orders order, @Param("expectedStatus") Integer expectedStatus);
+
+    @org.apache.ibatis.annotations.Update("update orders set status=2, pay_status=1, checkout_time=#{now}, pay_method=1 " +
+            "where id=#{id} and user_id=#{userId} and status=1 and pay_status=0 and timestampadd(MINUTE, 15, order_time) > #{now}")
+    int payIfPending(@Param("id") Long id, @Param("userId") Long userId, @Param("now") LocalDateTime now);
 
     /**
      * 插入订单数据

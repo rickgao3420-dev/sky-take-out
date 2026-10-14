@@ -10,6 +10,8 @@ import java.util.List;
 
 @Mapper
 public interface ShoppingCartMapper {
+    @Update("update shopping_cart set number=#{number}, amount=#{amount}, name=#{name}, image=#{image}, dish_flavor=#{dishFlavor} where id=#{id} and user_id=#{userId}")
+    void updateSnapshot(ShoppingCart row);
 
     /**
      * 动态条件查询购物车

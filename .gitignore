@@ -4,6 +4,14 @@
 *.class
 *Test.java
 **/test/
+!sky-server/src/test/
+!sky-server/src/test/java/
+!sky-server/src/test/java/com/
+!sky-server/src/test/java/com/sky/
+!sky-server/src/test/java/com/sky/service/
+!sky-server/src/test/java/com/sky/service/*Test.java
+!sky-server/src/test/resources/
+!sky-server/src/test/resources/logback-test.xml
 /.vscode/launch.json
 /.vscode/settings.json
 /sky-server/src/main/resources/application-dev.yml

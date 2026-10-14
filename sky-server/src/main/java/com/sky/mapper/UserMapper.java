@@ -11,6 +11,8 @@ import java.util.Map;
 
 @Mapper
 public interface UserMapper {
+    @Select("select id from user where id = #{id} for update")
+    Long lockById(Long id);
 
     /**
      * 根据openid查询用户
